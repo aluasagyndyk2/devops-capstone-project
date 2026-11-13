@@ -1,0 +1,48 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: flake8
+spec:
+  description: Lint the source and tests with the project's pinned flake8 version.
+  workspaces:
+    - name: source
+  steps:
+    - name: lint
+      image: python:3.9-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -eu
+        python -m pip install --no-cache-dir flake8==4.0.1
+        flake8 service tests
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nose
+spec:
+  description: Run the unit tests and enforce the repository coverage threshold.
+  workspaces:
+    - name: source
+  params:
+    - name: args
+      type: string
+      default: "-v"
+    - name: database_uri
+      type: string
+      default: "sqlite:///test.db"
+  steps:
+    - name: nosetests
+      image: python:3.9-slim
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: DATABASE_URI
+          value: $(params.database_uri)
+        - name: NOSE_ARGS
+          value: $(params.args)
+      script: |
+        #!/bin/sh
+        set -eu
+        python -m pip install --no-cache-dir -r requirements.txt
+        trap 'coverage report -m' EXIT
+        nosetests $NOSE_ARGS
