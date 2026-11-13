@@ -123,4 +123,106 @@ class TestAccountService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-    # ADD YOUR TEST CASES HERE ...
+    def test_read_account(self):
+        """It should read an existing account and follow its Location."""
+        account = self._create_accounts(1)[0]
+        response = self.client.get(f"{BASE_URL}/{account.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["email"], account.email)
+
+    def test_create_location_resolves(self):
+        """A created account should have a resolvable resource Location."""
+        response = self.client.post(BASE_URL, json=AccountFactory().serialize())
+        found = self.client.get(response.headers["Location"])
+        self.assertEqual(found.get_json(), response.get_json())
+
+    def test_read_missing_account(self):
+        """It should report a missing account as not found."""
+        response = self.client.get(f"{BASE_URL}/999999")
+        self.assertEqual(response.status_code, 404)
+
+    def test_list_accounts(self):
+        """It should list all persisted accounts."""
+        accounts = self._create_accounts(3)
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({a["id"] for a in response.get_json()},
+                         {a.id for a in accounts})
+
+    def test_list_empty_accounts(self):
+        """An empty collection should return an empty JSON array."""
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), [])
+
+    def test_update_account(self):
+        """It should update data while keeping the resource ID."""
+        account = self._create_accounts(1)[0]
+        data = account.serialize()
+        data["name"] = "Updated Customer"
+        data["id"] = 999999
+        response = self.client.put(f"{BASE_URL}/{account.id}", json=data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["id"], account.id)
+        self.assertEqual(response.get_json()["name"], "Updated Customer")
+        found = self.client.get(f"{BASE_URL}/{account.id}").get_json()
+        self.assertEqual(found["name"], "Updated Customer")
+
+    def test_update_missing_account(self):
+        """It should reject updates to missing accounts."""
+        response = self.client.put(f"{BASE_URL}/999999",
+                                   json=AccountFactory().serialize())
+        self.assertEqual(response.status_code, 404)
+
+    def test_update_bad_data(self):
+        """It should reject incomplete update data."""
+        account = self._create_accounts(1)[0]
+        response = self.client.put(f"{BASE_URL}/{account.id}", json={})
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_bad_media_type(self):
+        """It should reject non-JSON updates."""
+        account = self._create_accounts(1)[0]
+        response = self.client.put(f"{BASE_URL}/{account.id}",
+                                   data="not-json", content_type="text/plain")
+        self.assertEqual(response.status_code, 415)
+
+    def test_delete_account(self):
+        """Deletion should remove the account and be idempotent."""
+        account = self._create_accounts(1)[0]
+        url = f"{BASE_URL}/{account.id}"
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+
+    def test_delete_missing_account(self):
+        """Deleting a missing account should return no content."""
+        self.assertEqual(self.client.delete(f"{BASE_URL}/999999").status_code,
+                         204)
+
+    def test_invalid_json(self):
+        """Malformed JSON should produce a client error."""
+        response = self.client.post(BASE_URL, data="{",
+                                    content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_unsupported_method(self):
+        """Unsupported methods should return a structured client error."""
+        response = self.client.patch(BASE_URL, json={})
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.get_json()["status"], 405)
+
+    def test_security_headers(self):
+        """It should provide browser security headers."""
+        response = self.client.get("/")
+        self.assertEqual(response.headers.get("X-Content-Type-Options"),
+                         "nosniff")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "SAMEORIGIN")
+        self.assertIn("default-src", response.headers["Content-Security-Policy"])
+
+    def test_cors_headers(self):
+        """Allowed browser origins should receive CORS headers."""
+        origin = "https://example.com"
+        response = self.client.get("/", headers={"Origin": origin})
+        self.assertEqual(response.headers.get("Access-Control-Allow-Origin"),
+                         origin)
