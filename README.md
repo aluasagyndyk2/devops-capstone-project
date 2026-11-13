@@ -1,4 +1,19 @@
-# DevOps Capstone Template
+# devops-capstone-project
+
+[![CI Build](https://github.com/aluasagyndyk2/devops-capstone-project/actions/workflows/ci-build.yaml/badge.svg)](https://github.com/aluasagyndyk2/devops-capstone-project/actions/workflows/ci-build.yaml)
+
+Customer accounts REST microservice for the IBM DevOps Capstone teaching project,
+based on the official IBM template with AI-assisted implementation.
+The service supports create, list, read, update and idempotent delete operations.
+Flask-Talisman supplies browser security headers and Flask-CORS handles origins.
+Use synthetic data only: this educational service has no authentication.
+
+Verification: `flake8 service tests` and `nosetests` with a 95% coverage threshold.
+Build the non-root container with `docker build -t accounts:1.0 .`; it serves port
+8080 and requires a PostgreSQL DATABASE_URI or DATABASE_HOST configuration.
+TLS is terminated at the lab ingress while internal health checks use HTTP.
+The badge reports the real GitHub workflow status; deployment and sprint evidence
+must be collected from actual execution rather than inferred from configuration.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.9](https://img.shields.io/badge/Python-3.9-green.svg)](https://shields.io/)
